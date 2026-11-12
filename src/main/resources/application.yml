@@ -1,0 +1,20 @@
+spring:
+  application:
+    name: payment-gateway
+  datasource:
+    url: jdbc:postgresql://${GATEWAY_DB_HOST:localhost}:${GATEWAY_DB_PORT:5433}/${GATEWAY_DB_NAME:gateway}
+    username: ${GATEWAY_DB_USER:gateway}
+    password: ${GATEWAY_DB_PASSWORD:gateway}
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+  endpoint:
+    health:
+      show-details: always
