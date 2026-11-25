@@ -47,15 +47,19 @@ class PaymentRepositoryTests {
 	
 	@Test
 	void findsActivePaymentByOrderId() {
-		Payment payment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		Payment firstPayment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		firstPayment.decline();
+		repository.save(firstPayment);
 		
-		UUID paymentId = payment.getId();
-		repository.save(payment);
+		Payment secondPayment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		secondPayment.authorize("auth_2");
+		UUID paymentId = secondPayment.getId();
+		repository.save(secondPayment);
+		
 		entityManager.flush();
 		entityManager.clear();
 		
 		Payment foundPayment = repository.findPaymentByOrderIdAndStatusNot("ORD-1", PaymentStatus.DECLINED).orElseThrow();
-		// TODO: add declined payment once state transitions exist
 		assertThat(foundPayment.getId()).isEqualTo(paymentId);
 	}
 }

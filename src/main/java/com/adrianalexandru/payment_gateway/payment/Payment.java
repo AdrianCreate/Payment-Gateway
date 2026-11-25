@@ -136,4 +136,39 @@ public class Payment {
 	public PaymentStatus getStatus() {
 		return status;
 	}
+	
+	private void transitionTo(PaymentStatus target) {
+		if (!status.canTransitionTo(target)) {
+			throw new IllegalStateException("Cannot move payment " + id + " from " + status + " to " + target);
+		}
+		this.status = target;
+	}
+	
+	public void authorize(String bankAuthorizationId) {
+		transitionTo(PaymentStatus.AUTHORIZED);
+		this.bankAuthorizationId = bankAuthorizationId;
+		this.authorizedAt = Instant.now();
+	}
+	
+	public void decline() {
+		transitionTo(PaymentStatus.DECLINED);
+	}
+	
+	public void capture(String bankCaptureId) {
+		transitionTo(PaymentStatus.CAPTURED);
+		this.bankCaptureId = bankCaptureId;
+		this.capturedAt = Instant.now();
+	}
+	
+	public void voidPayment(String bankVoidId) {
+		transitionTo(PaymentStatus.VOIDED);
+		this.bankVoidId = bankVoidId;
+		this.voidedAt = Instant.now();
+	}
+	
+	public void refund(String bankRefundId) {
+		transitionTo(PaymentStatus.REFUNDED);
+		this.bankRefundId = bankRefundId;
+		this.refundedAt = Instant.now();
+	}
 }
