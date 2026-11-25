@@ -7,10 +7,12 @@ import org.springframework.boot.data.jpa.test.autoconfigure.DataJpaTest;
 import org.springframework.boot.jdbc.test.autoconfigure.AutoConfigureTestDatabase;
 import org.springframework.boot.jpa.test.autoconfigure.TestEntityManager;
 import org.springframework.context.annotation.Import;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.AssertionsForClassTypes.assertThatThrownBy;
 
 @DataJpaTest
 @Import(TestcontainersConfiguration.class)
@@ -47,15 +49,45 @@ class PaymentRepositoryTests {
 	
 	@Test
 	void findsActivePaymentByOrderId() {
-		Payment payment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		Payment firstPayment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		firstPayment.decline();
+		repository.save(firstPayment);
 		
-		UUID paymentId = payment.getId();
-		repository.save(payment);
+		Payment secondPayment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		secondPayment.authorize("auth_2");
+		UUID paymentId = secondPayment.getId();
+		repository.save(secondPayment);
+		
 		entityManager.flush();
 		entityManager.clear();
 		
 		Payment foundPayment = repository.findPaymentByOrderIdAndStatusNot("ORD-1", PaymentStatus.DECLINED).orElseThrow();
-		// TODO: add declined payment once state transitions exist
 		assertThat(foundPayment.getId()).isEqualTo(paymentId);
+	}
+	
+	@Test
+	void concurrentCaptureIsRejectedByVersionCheck() {
+		Payment payment = new Payment("ORD-1", "CUST-1", "4242", 1999);
+		payment.authorize("auth_1");
+		
+		repository.save(payment);
+		entityManager.flush();
+		entityManager.clear();
+		
+		Payment copyA = repository.findById(payment.getId()).orElseThrow();
+		entityManager.clear();
+		Payment copyB = repository.findById(payment.getId()).orElseThrow();
+		entityManager.clear();
+		
+		copyA.capture("cap_A");
+		repository.saveAndFlush(copyA);
+		copyB.capture("cap_B");
+		assertThatThrownBy(() -> repository.saveAndFlush(copyB))
+				.isInstanceOf(ObjectOptimisticLockingFailureException.class);
+		entityManager.clear();
+		Payment reloaded = repository.findById(payment.getId()).orElseThrow();
+		assertThat(reloaded.getBankCaptureId()).isEqualTo("cap_A");
+		assertThat(reloaded.getVersion()).isEqualTo(1);
+		assertThat(reloaded.getStatus()).isEqualTo(PaymentStatus.CAPTURED);
 	}
 }

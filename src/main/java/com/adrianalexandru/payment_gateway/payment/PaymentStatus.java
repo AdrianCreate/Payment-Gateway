@@ -6,5 +6,17 @@ public enum PaymentStatus {
 	CAPTURED,
 	VOIDED,
 	REFUNDED,
-	DECLINED
+	DECLINED;
+	
+	public boolean canTransitionTo(PaymentStatus target) {
+		return switch (this) {
+			case PENDING -> target == AUTHORIZED || target == DECLINED;
+			case AUTHORIZED -> target == CAPTURED || target == VOIDED;
+			case CAPTURED -> target == REFUNDED;
+			case VOIDED, REFUNDED, DECLINED -> false;
+		};
+	}
 }
+
+
+
